@@ -1,6 +1,6 @@
 # prom-metrics-client
 
-[![Build Status](https://travis-ci.org/alanshaw/prom-metrics-client.svg?branch=master)](https://travis-ci.org/alanshaw/prom-metrics-client)
+[![Build Status](https://img.shields.io/travis/com/libp2p/hydra-booster/master?style=flat-square)](https://travis-ci.org/alanshaw/prom-metrics-client)
 [![Coverage](https://img.shields.io/codecov/c/github/alanshaw/prom-metrics-client?style=flat-square)](https://codecov.io/gh/alanshaw/prom-metrics-client)
 [![Standard README](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
