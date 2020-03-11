@@ -25,10 +25,10 @@ import (
 
 func main() {
     c := pmc.PromMetricsClient{
-        URL: "http://localhost:8888/metrics"
+        URL: "http://localhost:8888/metrics",
     }
 
-    m := c.GetMetrics()
+    m, _ := c.GetMetrics()
 
     fmt.Println("Gauges:")
     for _, gauge := range m.Gauges {
