@@ -21,18 +21,25 @@ type Metrics struct {
 	Counters []Counter
 }
 
+// Value is a value for a metric
+type Value struct {
+	Name  string
+	Value float64
+	// Tags  map[string]string
+}
+
 // Counter is a cumulative metric that represents a single monotonically increasing counter whose value can only increase or be reset to zero on restart.
 type Counter struct {
 	Name        string
 	Description string
-	Value       float64
+	Values      []Value
 }
 
 // Gauge is a metric that represents a single numerical value that can arbitrarily go up and down.
 type Gauge struct {
 	Name        string
 	Description string
-	Value       float64
+	Values      []Value
 }
 
 // Histogram samples observations (usually things like request durations or response sizes) and counts them in configurable buckets.
@@ -98,47 +105,59 @@ func Parse(r io.Reader) (*Metrics, error) {
 		}
 
 		i++
-		if i >= llen {
-			break
-		}
 
 		switch typel.Type {
 		case "counter":
-			counterl, err := parseCounterLine(lines[i], i)
-			if err != nil {
-				return nil, err
+			var vals []Value
+
+			for {
+				if i >= llen || isHashLine(lines[i]) {
+					break
+				}
+
+				counterl, err := parseCounterLine(lines[i], i)
+				if err != nil {
+					return nil, err
+				}
+
+				vals = append(vals, Value{Name: counterl.Name, Value: counterl.Value})
+				i++
 			}
 
 			metrics.Counters = append(metrics.Counters, Counter{
 				Name:        helpl.Name,
 				Description: helpl.Description,
-				Value:       counterl.Value,
+				Values:      vals,
 			})
-
-			i++
 		case "gauge":
-			gaugel, err := parseGaugeLine(lines[i], i)
-			if err != nil {
-				return nil, err
+			var vals []Value
+
+			for {
+				if i >= llen || isHashLine(lines[i]) {
+					break
+				}
+
+				gaugel, err := parseGaugeLine(lines[i], i)
+				if err != nil {
+					return nil, err
+				}
+
+				vals = append(vals, Value{Name: gaugel.Name, Value: gaugel.Value})
+				i++
 			}
 
 			metrics.Gauges = append(metrics.Gauges, Gauge{
 				Name:        helpl.Name,
 				Description: helpl.Description,
-				Value:       gaugel.Value,
+				Values:      vals,
 			})
-
-			i++
 		default:
 			// Currently unsupported
 			for {
-				if isHashLine(lines[i]) {
+				if i >= llen || isHashLine(lines[i]) {
 					break
 				}
 				i++
-				if i >= llen {
-					break
-				}
 			}
 		}
 	}

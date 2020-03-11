@@ -27,8 +27,8 @@ func findCounter(counters []Counter, name string) *Counter {
 	return nil
 }
 
-func TestParse(t *testing.T) {
-	content, err := ioutil.ReadFile("testdata/sample0.txt")
+func TestParseMemstatsTxt(t *testing.T) {
+	content, err := ioutil.ReadFile("testdata/memstats.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,20 +38,20 @@ func TestParse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if g := findGauge(m.Gauges, "go_goroutines"); g.Value != 166 {
+	if g := findGauge(m.Gauges, "go_goroutines"); g.Values[0].Value != 166 {
 		t.Fatal("incorrect gauge value")
 	}
 
-	if g := findGauge(m.Gauges, "go_memstats_heap_objects"); g.Value != 33814 {
+	if g := findGauge(m.Gauges, "go_memstats_heap_objects"); g.Values[0].Value != 33814 {
 		t.Fatal("incorrect gauge value")
 	}
 
-	if c := findCounter(m.Counters, "go_memstats_mallocs_total"); c.Value != 44939 {
+	if c := findCounter(m.Counters, "go_memstats_mallocs_total"); c.Values[0].Value != 44939 {
 		t.Fatal("incorrect counter value")
 	}
 }
 
-func TestGet(t *testing.T) {
+func TestGetMemstatsTxt(t *testing.T) {
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestGet(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
-		http.ServeFile(w, req, "testdata/sample0.txt")
+		http.ServeFile(w, req, "testdata/memstats.txt")
 	})
 
 	go http.Serve(listener, mux)
@@ -74,15 +74,40 @@ func TestGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if g := findGauge(m.Gauges, "go_goroutines"); g.Value != 166 {
+	if g := findGauge(m.Gauges, "go_goroutines"); g.Values[0].Value != 166 {
 		t.Fatal("incorrect gauge value")
 	}
 
-	if g := findGauge(m.Gauges, "go_memstats_heap_objects"); g.Value != 33814 {
+	if g := findGauge(m.Gauges, "go_memstats_heap_objects"); g.Values[0].Value != 33814 {
 		t.Fatal("incorrect gauge value")
 	}
 
-	if c := findCounter(m.Counters, "go_memstats_mallocs_total"); c.Value != 44939 {
+	if c := findCounter(m.Counters, "go_memstats_mallocs_total"); c.Values[0].Value != 44939 {
 		t.Fatal("incorrect counter value")
+	}
+}
+
+func TestParseMultivalueTxt(t *testing.T) {
+	content, err := ioutil.ReadFile("testdata/multivalue.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := Parse(bytes.NewBuffer(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := findCounter(m.Counters, "hydrabooster_connected_peers")
+	if len(c.Values) != 2 {
+		t.Fatal("incorrect counter values len")
+	}
+
+	if c.Values[0].Value != 12 {
+		t.Fatal("incorrect counter value [0]")
+	}
+
+	if c.Values[1].Value != 6 {
+		t.Fatal("incorrect counter value [1]")
 	}
 }

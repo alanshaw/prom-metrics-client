@@ -1,0 +1,4 @@
+# HELP hydrabooster_connected_peers Peers connected to all sybils
+# TYPE hydrabooster_connected_peers counter
+hydrabooster_connected_peers{peer_id="12D3KooWFHTL3uCAvdFziDxDVVfRXhLXqfD36nAXk6UdGABhpFfG"} 12
+hydrabooster_connected_peers{peer_id="12D3KooWKFkndqao2awaTrp4yxEKwxnG1kha5wwyZrLY2MrQR3rX"} 6
