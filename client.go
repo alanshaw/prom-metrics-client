@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -15,42 +16,37 @@ var ErrUnexpectedHTTPStatusCode = fmt.Errorf("unexpected HTTP status code")
 // ErrParseFail is returned when parsing of metrics data fails
 var ErrParseFail = fmt.Errorf("failed to parse line")
 
-// Metrics are the parsed metrics from the endpoint.
-type Metrics struct {
-	Gauges   []Gauge
-	Counters []Counter
-}
+type MetricType string
 
-// Value is a value for a metric
-type Value struct {
-	Name  string
-	Value float64
-	// Tags  map[string]string
-}
+const (
+	Untyped MetricType = ""
+	// Counter is a cumulative metric that represents a single monotonically increasing counter whose value can only increase or be reset to zero on restart.
+	CounterType = "counter"
+	// Gauge is a metric that represents a single numerical value that can arbitrarily go up and down.
+	GaugeType = "gauge"
+	// Histogram samples observations (usually things like request durations or response sizes) and counts them in configurable buckets.
+	HistogramType = "histogram"
+	// Summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
+	SummaryType = "summary"
+)
 
-// Counter is a cumulative metric that represents a single monotonically increasing counter whose value can only increase or be reset to zero on restart.
-type Counter struct {
+// Metric are the parsed metrics from the endpoint.
+type Metric struct {
 	Name        string
 	Description string
-	Values      []Value
+	Type        MetricType
+	Samples     []*Sample
 }
 
-// Gauge is a metric that represents a single numerical value that can arbitrarily go up and down.
-type Gauge struct {
-	Name        string
-	Description string
-	Values      []Value
+// HistogramMetric
+// SummaryMetric
+
+type Sample struct {
+	Name      string
+	Labels    map[string]string
+	Value     float64
+	Timestamp int64
 }
-
-// Histogram samples observations (usually things like request durations or response sizes) and counts them in configurable buckets.
-// type Histogram struct {
-// 	Description string
-// }
-
-// Summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
-// type Summary struct {
-// 	Description string
-// }
 
 // PromMetricsClient is a simple client that fetches and parses metrics from a prometheus /metrics endpoint.
 type PromMetricsClient struct {
@@ -58,7 +54,7 @@ type PromMetricsClient struct {
 }
 
 // GetMetrics retrieves metrics from the address
-func (c *PromMetricsClient) GetMetrics() (*Metrics, error) {
+func (c *PromMetricsClient) GetMetrics() ([]*Metric, error) {
 	res, err := http.Get(c.URL)
 	if err != nil {
 		return nil, err
@@ -73,192 +69,151 @@ func (c *PromMetricsClient) GetMetrics() (*Metrics, error) {
 }
 
 // Parse reads raw metrics data from the reader, parses it and returns the result
-func Parse(r io.Reader) (*Metrics, error) {
-	bytes, err := ioutil.ReadAll(r)
+func Parse(r io.Reader) ([]*Metric, error) {
+	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
 
-	var metrics Metrics
-	lines := strings.Split(strings.Trim(string(bytes), "\n\r"), "\n")
-	llen := len(lines)
+	var m *Metric
+	var ms []*Metric
 
-	i := 0
-	for {
-		if i >= llen {
-			break
+	lns := strings.Split(string(b), "\n")
+
+	for i, ln := range lns {
+		if ln == "" || isCommentLine(ln) {
+			continue
 		}
 
-		helpl, err := parseHelpLine(lines[i], i)
+		nm, err := parseLine(m, ln, i)
 		if err != nil {
 			return nil, err
 		}
 
-		i++
-		if i >= llen {
-			break
+		if m == nil {
+			m = nm
 		}
 
-		typel, err := parseTypeLine(lines[i], i)
-		if err != nil {
-			return nil, err
-		}
-
-		i++
-
-		switch typel.Type {
-		case "counter":
-			var vals []Value
-
-			for {
-				if i >= llen || isHashLine(lines[i]) {
-					break
-				}
-
-				counterl, err := parseCounterLine(lines[i], i)
-				if err != nil {
-					return nil, err
-				}
-
-				vals = append(vals, Value{Name: counterl.Name, Value: counterl.Value})
-				i++
-			}
-
-			metrics.Counters = append(metrics.Counters, Counter{
-				Name:        helpl.Name,
-				Description: helpl.Description,
-				Values:      vals,
-			})
-		case "gauge":
-			var vals []Value
-
-			for {
-				if i >= llen || isHashLine(lines[i]) {
-					break
-				}
-
-				gaugel, err := parseGaugeLine(lines[i], i)
-				if err != nil {
-					return nil, err
-				}
-
-				vals = append(vals, Value{Name: gaugel.Name, Value: gaugel.Value})
-				i++
-			}
-
-			metrics.Gauges = append(metrics.Gauges, Gauge{
-				Name:        helpl.Name,
-				Description: helpl.Description,
-				Values:      vals,
-			})
-		default:
-			// Currently unsupported
-			for {
-				if i >= llen || isHashLine(lines[i]) {
-					break
-				}
-				i++
-			}
+		if nm != m {
+			ms = append(ms, m)
+			m = nm
 		}
 	}
 
-	return &metrics, nil
+	if m != nil {
+		// TODO: upgrade metric to HistogramMetric or SummaryMetric
+		ms = append(ms, m)
+	}
+
+	return ms, nil
 }
 
-func isHashLine(l string) bool {
-	return l[0:1] == "#"
+func parseLine(m *Metric, l string, n int) (*Metric, error) {
+	if isHelpLine(l) {
+		return parseHelpLine(m, l, n)
+	}
+	if isTypeLine(l) {
+		return parseTypeLine(m, l, n)
+	}
+	return parseSampleLine(m, l, n)
 }
 
-type helpLine struct {
-	Name        string
-	Description string
+func isCommentLine(l string) bool {
+	return l[0:1] == "#" && !isHelpLine(l) && !isTypeLine(l)
 }
 
-func parseHelpLine(l string, n int) (*helpLine, error) {
+var startHelpLine = regexp.MustCompile("^#\\s+HELP\\s+")
+
+func isHelpLine(l string) bool {
+	return startHelpLine.MatchString(l[0:6])
+}
+
+var startTypeLine = regexp.MustCompile("^#\\s+TYPE\\s+")
+
+func isTypeLine(l string) bool {
+	return startTypeLine.MatchString(l[0:6])
+}
+
+var ws = regexp.MustCompile("\\s+")
+
+func parseHelpLine(m *Metric, l string, n int) (*Metric, error) {
 	// fmt.Println("parseHelpLine", l)
-	l = strings.Trim(l, "\n\r")
+	l = startHelpLine.ReplaceAllString(l, "")
+	sp := ws.Split(l, 1)
 
-	if strings.Index(l, "# HELP ") != 0 {
-		return nil, fmt.Errorf("expecting '# HELP ' at line %d: %w", n, ErrParseFail)
+	if m == nil || sp[0] != m.Name {
+		m = &Metric{}
 	}
 
-	l = l[7:]
-	si := strings.Index(l, " ")
-	if si == -1 {
-		return nil, fmt.Errorf("missing separator at line %d: %w", n, ErrParseFail)
+	m.Name = sp[0]
+
+	if len(sp) > 1 {
+		m.Description = sp[1]
 	}
 
-	name := l[0:si]
-	desc := l[si+1:]
-
-	return &helpLine{Name: name, Description: desc}, nil
+	return m, nil
 }
 
-type typeLine struct {
-	Name string
-	Type string
-}
-
-func parseTypeLine(l string, n int) (*typeLine, error) {
+func parseTypeLine(m *Metric, l string, n int) (*Metric, error) {
 	// fmt.Println("parseTypeLine", l)
-	l = strings.Trim(l, "\n\r")
+	l = startTypeLine.ReplaceAllString(l, "")
+	sp := ws.Split(l, 1)
 
-	if strings.Index(l, "# TYPE ") != 0 {
-		return nil, fmt.Errorf("expecting '# TYPE ' at line %d: %w", n, ErrParseFail)
+	if len(sp) < 2 {
+		return nil, fmt.Errorf("invalid TYPE at line %d: %w", n, ErrParseFail)
 	}
 
-	l = l[7:]
-	si := strings.Index(l, " ")
-	if si == -1 {
-		return nil, fmt.Errorf("missing separator at line %d: %w", n, ErrParseFail)
+	if m == nil || sp[0] != m.Name {
+		m = &Metric{}
 	}
 
-	name := l[0:si]
-	typ := l[si+1:]
+	m.Name = sp[0]
+	m.Type = MetricType(sp[1])
 
-	return &typeLine{Name: name, Type: typ}, nil
+	return m, nil
 }
 
-type counterLine struct {
-	Name  string
-	Value float64
-}
+func parseSampleLine(m *Metric, l string, n int) (*Metric, error) {
+	// fmt.Println("parseSampleLine", l)
 
-func parseCounterLine(l string, n int) (*counterLine, error) {
-	// fmt.Println("parseCounterLine", l)
-	l = strings.Trim(l, "\n\r")
-	split := strings.Split(l, " ")
-
-	if len(split) != 2 {
-		return nil, fmt.Errorf("invalid counter at line %d: %w", n, ErrParseFail)
+	// TODO: parse labels
+	// var labels string
+	fic := strings.Index(l, "{")
+	if fic > -1 {
+		lic := strings.LastIndex(l, "}")
+		// labels = l[fic : lic+1]
+		l = l[0:fic] + l[lic+1:]
 	}
 
-	val, err := strconv.ParseFloat(split[1], 64)
+	sp := ws.Split(l, -1)
+
+	if len(sp) < 2 {
+		return nil, fmt.Errorf("invalid sample at line %d: %w", n, ErrParseFail)
+	}
+
+	val, err := strconv.ParseFloat(sp[1], 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid float64 at line %d: %w", n, ErrParseFail)
+		return nil, fmt.Errorf("invalid float64 value at line %d: %w", n, ErrParseFail)
 	}
 
-	return &counterLine{Name: split[0], Value: val}, nil
-}
-
-type gaugeLine struct {
-	Name  string
-	Value float64
-}
-
-func parseGaugeLine(l string, n int) (*gaugeLine, error) {
-	// fmt.Println("parseGaugeLine", l)
-	l = strings.Trim(l, "\n\r")
-	split := strings.Split(l, " ")
-
-	if len(split) != 2 {
-		return nil, fmt.Errorf("invalid gauge at line %d: %w", n, ErrParseFail)
+	s := Sample{
+		Name:  sp[0],
+		Value: val,
 	}
 
-	val, err := strconv.ParseFloat(split[1], 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid float64 at line %d: %w", n, ErrParseFail)
+	if len(sp) >= 3 {
+		val, err := strconv.ParseInt(sp[2], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid int64 timestamp at line %d: %w", n, ErrParseFail)
+		}
+		s.Timestamp = val
 	}
 
-	return &gaugeLine{Name: split[0], Value: val}, nil
+	if m == nil || strings.Index(s.Name, m.Name) != 0 {
+		m = &Metric{Name: s.Name}
+	}
+
+	m.Samples = append(m.Samples, &s)
+
+	return m, nil
 }

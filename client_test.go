@@ -9,21 +9,13 @@ import (
 	"testing"
 )
 
-func findGauge(gauges []Gauge, name string) *Gauge {
-	for _, g := range gauges {
-		if g.Name == name {
-			return &g
+func findMetric(t *testing.T, ms []*Metric, name string) *Metric {
+	for _, m := range ms {
+		if m.Name == name {
+			return m
 		}
 	}
-	return nil
-}
-
-func findCounter(counters []Counter, name string) *Counter {
-	for _, c := range counters {
-		if c.Name == name {
-			return &c
-		}
-	}
+	t.Fatal("missing metric", name)
 	return nil
 }
 
@@ -33,20 +25,20 @@ func TestParseMemstatsTxt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := Parse(bytes.NewBuffer(content))
+	ms, err := Parse(bytes.NewBuffer(content))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if g := findGauge(m.Gauges, "go_goroutines"); g.Values[0].Value != 166 {
+	if m := findMetric(t, ms, "go_goroutines"); m.Samples[0].Value != 166 {
 		t.Fatal("incorrect gauge value")
 	}
 
-	if g := findGauge(m.Gauges, "go_memstats_heap_objects"); g.Values[0].Value != 33814 {
+	if m := findMetric(t, ms, "go_memstats_heap_objects"); m.Samples[0].Value != 33814 {
 		t.Fatal("incorrect gauge value")
 	}
 
-	if c := findCounter(m.Counters, "go_memstats_mallocs_total"); c.Values[0].Value != 44939 {
+	if m := findMetric(t, ms, "go_memstats_mallocs_total"); m.Samples[0].Value != 44939 {
 		t.Fatal("incorrect counter value")
 	}
 }
@@ -69,45 +61,62 @@ func TestGetMemstatsTxt(t *testing.T) {
 		URL: fmt.Sprintf("http://%v/metrics", listener.Addr().String()),
 	}
 
-	m, err := c.GetMetrics()
+	ms, err := c.GetMetrics()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if g := findGauge(m.Gauges, "go_goroutines"); g.Values[0].Value != 166 {
+	if m := findMetric(t, ms, "go_goroutines"); m.Samples[0].Value != 166 {
 		t.Fatal("incorrect gauge value")
 	}
 
-	if g := findGauge(m.Gauges, "go_memstats_heap_objects"); g.Values[0].Value != 33814 {
+	if m := findMetric(t, ms, "go_memstats_heap_objects"); m.Samples[0].Value != 33814 {
 		t.Fatal("incorrect gauge value")
 	}
 
-	if c := findCounter(m.Counters, "go_memstats_mallocs_total"); c.Values[0].Value != 44939 {
+	if m := findMetric(t, ms, "go_memstats_mallocs_total"); m.Samples[0].Value != 44939 {
 		t.Fatal("incorrect counter value")
 	}
 }
 
-func TestParseMultivalueTxt(t *testing.T) {
-	content, err := ioutil.ReadFile("testdata/multivalue.txt")
+func TestParseMultisampleTxt(t *testing.T) {
+	content, err := ioutil.ReadFile("testdata/multisample.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	m, err := Parse(bytes.NewBuffer(content))
+	ms, err := Parse(bytes.NewBuffer(content))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	c := findCounter(m.Counters, "hydrabooster_connected_peers")
-	if len(c.Values) != 2 {
+	m := findMetric(t, ms, "hydrabooster_connected_peers")
+	if len(m.Samples) != 2 {
 		t.Fatal("incorrect counter values len")
 	}
 
-	if c.Values[0].Value != 12 {
+	if m.Samples[0].Value != 12 {
 		t.Fatal("incorrect counter value [0]")
 	}
 
-	if c.Values[1].Value != 6 {
+	if m.Samples[1].Value != 6 {
 		t.Fatal("incorrect counter value [1]")
+	}
+}
+
+func TestParseExampleTxt(t *testing.T) {
+	content, err := ioutil.ReadFile("testdata/example.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ms, err := Parse(bytes.NewBuffer(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// metric with no HELP or TYPE info should be separate metric
+	if m := findMetric(t, ms, "msdos_file_access_time_seconds"); m.Type != Untyped {
+		t.Fatal("incorrect metric")
 	}
 }

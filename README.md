@@ -6,6 +6,8 @@
 
 > A simple client that fetches and parses metrics from a prometheus `/metrics` endpoint.
 
+https://prometheus.io/docs/instrumenting/exposition_formats/
+
 ## Install
 
 ```console
@@ -14,7 +16,7 @@ go get github.com/alanshaw/prom-metrics-client
 
 ## Usage
 
-⚠️ Currently only supports counters and gauges and ignores keys.
+⚠️ Currently ignores all labels and has no special handling for histogram or summary types.
 
 ```go
 package main
@@ -24,22 +26,26 @@ import (
 )
 
 func main() {
-    c := pmc.PromMetricsClient{
-        URL: "http://localhost:8888/metrics",
-    }
-
-    m, _ := c.GetMetrics()
-
-    fmt.Println("Gauges:")
-    for _, gauge := range m.Gauges {
-		fmt.Printf("%+v\n", gauge)
+	c := pmc.PromMetricsClient{
+		URL: "http://localhost:8888/metrics",
 	}
 
-    fmt.Println("Counters:")
-    for _, counter := range m.Counters {
-        fmt.Printf("%+v\n", counter)
-    }
+	ms, _ := c.GetMetrics()
+
+	for _, m := range ms {
+		fmt.Printf("%+v\n", m)
+	}
 }
+
+/*
+Example output:
+&{Name:http_requests_total Description:The total number of HTTP requests. Type:counter Samples:[0xc000132090 0xc0001320c0]}
+&{Name:msdos_file_access_time_seconds Description: Type: Samples:[0xc0001320f0]}
+&{Name:metric_without_timestamp_and_labels Description: Type: Samples:[0xc000132120]}
+&{Name:something_weird Description: Type: Samples:[0xc000132150]}
+&{Name:http_request_duration_seconds Description:A histogram of the request duration. Type:histogram Samples:[0xc000132180 0xc0001321b0 0xc0001321e0 0xc000132210 0xc000132240 0xc000132270 0xc0001322a0 0xc0001322d0]}
+&{Name:rpc_duration_seconds Description:A summary of the RPC duration in seconds. Type:summary Samples:[0xc000132300 0xc000132330 0xc000132360 0xc000132390 0xc0001323c0 0xc0001323f0 0xc000132420]}
+*/
 ```
 
 ## Contribute
