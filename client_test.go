@@ -19,6 +19,12 @@ func findMetric(t *testing.T, ms []*Metric, name string) *Metric {
 	return nil
 }
 
+func TestIsHelpLine(t *testing.T) {
+	if !isHelpLine("# HELP ") {
+		t.Fatal("expected to be help line")
+	}
+}
+
 func TestParseMemstatsTxt(t *testing.T) {
 	content, err := ioutil.ReadFile("testdata/memstats.txt")
 	if err != nil {
@@ -113,6 +119,10 @@ func TestParseExampleTxt(t *testing.T) {
 	ms, err := Parse(bytes.NewBuffer(content))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	for _, m := range ms {
+		fmt.Printf("%+v\n", m)
 	}
 
 	// metric with no HELP or TYPE info should be separate metric

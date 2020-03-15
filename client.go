@@ -125,13 +125,13 @@ func isCommentLine(l string) bool {
 var startHelpLine = regexp.MustCompile("^#\\s+HELP\\s+")
 
 func isHelpLine(l string) bool {
-	return startHelpLine.MatchString(l[0:6])
+	return startHelpLine.MatchString(l)
 }
 
 var startTypeLine = regexp.MustCompile("^#\\s+TYPE\\s+")
 
 func isTypeLine(l string) bool {
-	return startTypeLine.MatchString(l[0:6])
+	return startTypeLine.MatchString(l)
 }
 
 var ws = regexp.MustCompile("\\s+")
@@ -139,7 +139,7 @@ var ws = regexp.MustCompile("\\s+")
 func parseHelpLine(m *Metric, l string, n int) (*Metric, error) {
 	// fmt.Println("parseHelpLine", l)
 	l = startHelpLine.ReplaceAllString(l, "")
-	sp := ws.Split(l, 1)
+	sp := ws.Split(l, 2)
 
 	if m == nil || sp[0] != m.Name {
 		m = &Metric{}
@@ -157,7 +157,7 @@ func parseHelpLine(m *Metric, l string, n int) (*Metric, error) {
 func parseTypeLine(m *Metric, l string, n int) (*Metric, error) {
 	// fmt.Println("parseTypeLine", l)
 	l = startTypeLine.ReplaceAllString(l, "")
-	sp := ws.Split(l, 1)
+	sp := ws.Split(l, 2)
 
 	if len(sp) < 2 {
 		return nil, fmt.Errorf("invalid TYPE at line %d: %w", n, ErrParseFail)
