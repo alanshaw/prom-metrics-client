@@ -16,7 +16,7 @@ go get github.com/alanshaw/prom-metrics-client
 
 ## Usage
 
-⚠️ Currently ignores all labels and has no special handling for histogram or summary types.
+⚠️ Currently has no special handling for histogram or summary types.
 
 ```go
 package main

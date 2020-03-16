@@ -68,6 +68,13 @@ func (c *PromMetricsClient) GetMetrics() ([]*Metric, error) {
 	return Parse(res.Body)
 }
 
+var (
+	startHelpLineRE = regexp.MustCompile("^#\\s+HELP\\s+")
+	startTypeLineRE = regexp.MustCompile("^#\\s+TYPE\\s+")
+	wsRE            = regexp.MustCompile("\\s+")
+	labelRE         = regexp.MustCompile("([a-zA-Z_][a-zA-Z0-9_]*)=\"((?:\\\\\"|[^\"])*)\"")
+)
+
 // Parse reads raw metrics data from the reader, parses it and returns the result
 func Parse(r io.Reader) ([]*Metric, error) {
 	b, err := ioutil.ReadAll(r)
@@ -122,24 +129,18 @@ func isCommentLine(l string) bool {
 	return l[0:1] == "#" && !isHelpLine(l) && !isTypeLine(l)
 }
 
-var startHelpLine = regexp.MustCompile("^#\\s+HELP\\s+")
-
 func isHelpLine(l string) bool {
-	return startHelpLine.MatchString(l)
+	return startHelpLineRE.MatchString(l)
 }
-
-var startTypeLine = regexp.MustCompile("^#\\s+TYPE\\s+")
 
 func isTypeLine(l string) bool {
-	return startTypeLine.MatchString(l)
+	return startTypeLineRE.MatchString(l)
 }
-
-var ws = regexp.MustCompile("\\s+")
 
 func parseHelpLine(m *Metric, l string, n int) (*Metric, error) {
 	// fmt.Println("parseHelpLine", l)
-	l = startHelpLine.ReplaceAllString(l, "")
-	sp := ws.Split(l, 2)
+	l = startHelpLineRE.ReplaceAllString(l, "")
+	sp := wsRE.Split(l, 2)
 
 	if m == nil || sp[0] != m.Name {
 		m = &Metric{}
@@ -156,8 +157,8 @@ func parseHelpLine(m *Metric, l string, n int) (*Metric, error) {
 
 func parseTypeLine(m *Metric, l string, n int) (*Metric, error) {
 	// fmt.Println("parseTypeLine", l)
-	l = startTypeLine.ReplaceAllString(l, "")
-	sp := ws.Split(l, 2)
+	l = startTypeLineRE.ReplaceAllString(l, "")
+	sp := wsRE.Split(l, 2)
 
 	if len(sp) < 2 {
 		return nil, fmt.Errorf("invalid TYPE at line %d: %w", n, ErrParseFail)
@@ -174,18 +175,16 @@ func parseTypeLine(m *Metric, l string, n int) (*Metric, error) {
 }
 
 func parseSampleLine(m *Metric, l string, n int) (*Metric, error) {
-	// fmt.Println("parseSampleLine", l)
+	var labels string
 
-	// TODO: parse labels
-	// var labels string
 	fic := strings.Index(l, "{")
 	if fic > -1 {
 		lic := strings.LastIndex(l, "}")
-		// labels = l[fic : lic+1]
+		labels = l[fic : lic+1]
 		l = l[0:fic] + l[lic+1:]
 	}
 
-	sp := ws.Split(l, -1)
+	sp := wsRE.Split(l, -1)
 
 	if len(sp) < 2 {
 		return nil, fmt.Errorf("invalid sample at line %d: %w", n, ErrParseFail)
@@ -197,8 +196,9 @@ func parseSampleLine(m *Metric, l string, n int) (*Metric, error) {
 	}
 
 	s := Sample{
-		Name:  sp[0],
-		Value: val,
+		Name:   sp[0],
+		Value:  val,
+		Labels: parseLabels(labels),
 	}
 
 	if len(sp) >= 3 {
@@ -216,4 +216,13 @@ func parseSampleLine(m *Metric, l string, n int) (*Metric, error) {
 	m.Samples = append(m.Samples, &s)
 
 	return m, nil
+}
+
+func parseLabels(s string) map[string]string {
+	ma := labelRE.FindAllStringSubmatch(s, -1)
+	lbs := make(map[string]string)
+	for _, sm := range ma {
+		lbs[sm[1]] = sm[2]
+	}
+	return lbs
 }
