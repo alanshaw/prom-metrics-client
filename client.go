@@ -16,21 +16,23 @@ var ErrUnexpectedHTTPStatusCode = fmt.Errorf("unexpected HTTP status code")
 // ErrParseFail is returned when parsing of metrics data fails
 var ErrParseFail = fmt.Errorf("failed to parse line")
 
+// MetricType describes the type of the metric that was collected. See https://prometheus.io/docs/concepts/metric_types/
 type MetricType string
 
 const (
+	// Untyped is the metric type of metrics that have no specified type
 	Untyped MetricType = ""
-	// Counter is a cumulative metric that represents a single monotonically increasing counter whose value can only increase or be reset to zero on restart.
+	// CounterType is a cumulative metric that represents a single monotonically increasing counter whose value can only increase or be reset to zero on restart.
 	CounterType = "counter"
-	// Gauge is a metric that represents a single numerical value that can arbitrarily go up and down.
+	// GaugeType is a metric that represents a single numerical value that can arbitrarily go up and down.
 	GaugeType = "gauge"
-	// Histogram samples observations (usually things like request durations or response sizes) and counts them in configurable buckets.
+	// HistogramType samples observations (usually things like request durations or response sizes) and counts them in configurable buckets.
 	HistogramType = "histogram"
-	// Summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
+	// SummaryType samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
 	SummaryType = "summary"
 )
 
-// Metric are the parsed metrics from the endpoint.
+// Metric is a parsed metric from the endpoint.
 type Metric struct {
 	Name        string
 	Description string
@@ -41,6 +43,7 @@ type Metric struct {
 // HistogramMetric
 // SummaryMetric
 
+// Sample is a sample taken for a particular metric.
 type Sample struct {
 	Name      string
 	Labels    map[string]string
@@ -53,7 +56,7 @@ type PromMetricsClient struct {
 	URL string
 }
 
-// GetMetrics retrieves metrics from the address
+// GetMetrics retrieves metrics from the stored URL
 func (c *PromMetricsClient) GetMetrics() ([]*Metric, error) {
 	res, err := http.Get(c.URL)
 	if err != nil {
@@ -95,6 +98,7 @@ func Parse(r io.Reader) ([]*Metric, error) {
 		}
 
 		if nm != m {
+			// TODO: upgrade metric to HistogramMetric or SummaryMetric
 			ms = append(ms, m)
 			m = nm
 		}
@@ -137,7 +141,6 @@ func isTypeLine(l string) bool {
 var ws = regexp.MustCompile("\\s+")
 
 func parseHelpLine(m *Metric, l string, n int) (*Metric, error) {
-	// fmt.Println("parseHelpLine", l)
 	l = startHelpLine.ReplaceAllString(l, "")
 	sp := ws.Split(l, 2)
 
@@ -155,7 +158,6 @@ func parseHelpLine(m *Metric, l string, n int) (*Metric, error) {
 }
 
 func parseTypeLine(m *Metric, l string, n int) (*Metric, error) {
-	// fmt.Println("parseTypeLine", l)
 	l = startTypeLine.ReplaceAllString(l, "")
 	sp := ws.Split(l, 2)
 
@@ -174,8 +176,6 @@ func parseTypeLine(m *Metric, l string, n int) (*Metric, error) {
 }
 
 func parseSampleLine(m *Metric, l string, n int) (*Metric, error) {
-	// fmt.Println("parseSampleLine", l)
-
 	// TODO: parse labels
 	// var labels string
 	fic := strings.Index(l, "{")

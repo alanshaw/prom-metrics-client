@@ -3,6 +3,8 @@
 [![Build Status](https://img.shields.io/travis/com/libp2p/hydra-booster/master?style=flat-square)](https://travis-ci.org/alanshaw/prom-metrics-client)
 [![Coverage](https://img.shields.io/codecov/c/github/alanshaw/prom-metrics-client?style=flat-square)](https://codecov.io/gh/alanshaw/prom-metrics-client)
 [![Standard README](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
+[![GoDoc](http://img.shields.io/badge/godoc-reference-5272B4.svg?style=flat-square)](https://godoc.org/github.com/alanshaw/prom-metrics-client)
+[![golang version](https://img.shields.io/badge/golang-%3E%3D1.14.0-orange.svg?style=flat-square)](https://golang.org/)
 
 > A simple client that fetches and parses metrics from a prometheus `/metrics` endpoint.
 
