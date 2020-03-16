@@ -75,7 +75,7 @@ var (
 	startHelpLineRE = regexp.MustCompile("^#\\s+HELP\\s+")
 	startTypeLineRE = regexp.MustCompile("^#\\s+TYPE\\s+")
 	wsRE            = regexp.MustCompile("\\s+")
-	labelRE         = regexp.MustCompile("([a-zA-Z_][a-zA-Z0-9_]*)=\"((?:\\\\\"|[^\"])*)\"")
+	labelRE         = regexp.MustCompile("([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*\"((?:\\\\\"|[^\"])*)\"")
 )
 
 // Parse reads raw metrics data from the reader, parses it and returns the result
