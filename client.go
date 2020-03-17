@@ -40,9 +40,6 @@ type Metric struct {
 	Samples     []*Sample
 }
 
-// HistogramMetric
-// SummaryMetric
-
 // Sample is a sample taken for a particular metric.
 type Sample struct {
 	Name      string
@@ -105,14 +102,12 @@ func Parse(r io.Reader) ([]*Metric, error) {
 		}
 
 		if nm != m {
-			// TODO: upgrade metric to HistogramMetric or SummaryMetric
 			ms = append(ms, m)
 			m = nm
 		}
 	}
 
 	if m != nil {
-		// TODO: upgrade metric to HistogramMetric or SummaryMetric
 		ms = append(ms, m)
 	}
 

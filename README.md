@@ -18,7 +18,7 @@ go get github.com/alanshaw/prom-metrics-client
 
 ## Usage
 
-⚠️ Currently has no special handling for histogram or summary types.
+### Example
 
 ```go
 package main
@@ -32,21 +32,31 @@ func main() {
 		URL: "http://localhost:8888/metrics",
 	}
 
-	ms, _ := c.GetMetrics()
+	ms, _ := c.GetMetrics() // returns []*Metric
 
 	for _, m := range ms {
-		fmt.Printf("%+v\n", m)
+		// histogram and summary metrics can be upgraded to "richer" types
+		if m.Type == HistogramType {
+			hm, _ := c.UpgradeHistogram(m)
+			fmt.Printf("%+v\n", hm)
+		} else if m.Type == SummaryType {
+			sm, _ := c.UpgradeSummary(m)
+			fmt.Printf("%+v\n", sm)
+		} else {
+			fmt.Printf("%+v\n", m)
+		}
 	}
 }
 
 /*
 Example output:
-&{Name:http_requests_total Description:The total number of HTTP requests. Type:counter Samples:[0xc000132090 0xc0001320c0]}
-&{Name:msdos_file_access_time_seconds Description: Type: Samples:[0xc0001320f0]}
-&{Name:metric_without_timestamp_and_labels Description: Type: Samples:[0xc000132120]}
-&{Name:something_weird Description: Type: Samples:[0xc000132150]}
-&{Name:http_request_duration_seconds Description:A histogram of the request duration. Type:histogram Samples:[0xc000132180 0xc0001321b0 0xc0001321e0 0xc000132210 0xc000132240 0xc000132270 0xc0001322a0 0xc0001322d0]}
-&{Name:rpc_duration_seconds Description:A summary of the RPC duration in seconds. Type:summary Samples:[0xc000132300 0xc000132330 0xc000132360 0xc000132390 0xc0001323c0 0xc0001323f0 0xc000132420]}
+
+&{Name:http_requests_total Description:The total number of HTTP requests. Type:counter Samples:[0xc00033e8a0 0xc00033e960]}
+&{Name:msdos_file_access_time_seconds Description: Type: Samples:[0xc00033ea20]}
+&{Name:metric_without_timestamp_and_labels Description: Type: Samples:[0xc00033eae0]}
+&{Name:something_weird Description: Type: Samples:[0xc00033eb40]}
+&{Metric:{Name:http_request_duration_seconds Description:A histogram of the request duration. Type:histogram Samples:[0xc00033ebd0 0xc00033ec60 0xc00033ecf0 0xc00033ed80 0xc00033ee10 0xc00033eea0 0xc00033ef30 0xc00033ef90]} Buckets:[0xc000015520 0xc000015530 0xc000015540 0xc000015550 0xc000015560 0xc000015570] Sum:53423 Count:144320}
+&{Metric:{Name:rpc_duration_seconds Description:A summary of the RPC duration in seconds. Type:summary Samples:[0xc00033eff0 0xc00033f080 0xc00033f110 0xc00033f1a0 0xc00033f230 0xc00033f2c0 0xc00033f320]} Quantiles:[0xc0000155d0 0xc0000155e0 0xc0000155f0 0xc000015600 0xc000015610] Sum:1.7560473e+07 Count:2693}
 */
 ```
 
