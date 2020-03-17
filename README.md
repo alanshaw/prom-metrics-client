@@ -50,6 +50,10 @@ Example output:
 */
 ```
 
+## API
+
+[GoDoc Reference](https://godoc.org/github.com/alanshaw/prom-metrics-client)
+
 ## Contribute
 
 Feel free to dive in! [Open an issue](https://github.com/alanshaw/prom-metrics-client/issues/new) or submit PRs.
