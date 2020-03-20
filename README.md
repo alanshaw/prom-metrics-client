@@ -36,11 +36,11 @@ func main() {
 
 	for _, m := range ms {
 		// histogram and summary metrics can be upgraded to "richer" types
-		if m.Type == HistogramType {
-			hm, _ := c.UpgradeHistogram(m)
+		if m.Type == pmc.HistogramType {
+			hm, _ := pmc.UpgradeHistogram(m)
 			fmt.Printf("%+v\n", hm)
-		} else if m.Type == SummaryType {
-			sm, _ := c.UpgradeSummary(m)
+		} else if m.Type == pmc.SummaryType {
+			sm, _ := pmc.UpgradeSummary(m)
 			fmt.Printf("%+v\n", sm)
 		} else {
 			fmt.Printf("%+v\n", m)
